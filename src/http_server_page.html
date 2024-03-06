@@ -1,0 +1,121 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ESP-RS Web3 Lock</title>
+<style type="text/css">
+body {
+    align-items: center;
+    justify-content: center;
+	max-width: 50em;
+	margin: auto;
+	padding: 1em;
+	font: 1em/1.65 sans-serif;
+    background-color: aquamarine;
+}
+button {
+    background-color: darkblue;
+    border-radius: 5px;
+    border: 1px solid silver;
+    color: silver;
+    font-weight: 700;
+    padding: 10px;
+}
+input {
+    width: 100%;
+    height: 3em;
+    margin-bottom: 1em;
+}
+</style>
+</head>
+<body>
+    <h1>Welcome to this ESP32 Web3 Lock</h1>
+    <hr />
+    <button id="connect-button">Connect</button>
+    <form id="the-form" action="/post" method="post" accept-charset="utf-8">
+    </form>
+<!--     <p id="server-resp"></p> -->
+    <p id="signed-message"></p>
+<script type="text/javascript">
+
+// Test this!
+//import { WalletConnectModal } from 'https://unpkg.com/@walletconnect/modal'
+
+let theForm = document.getElementById("the-form");
+//let serverResp = document.getElementById("server-resp");
+let connectButton = document.getElementById("connect-button");
+let signedMessage = document.getElementById("signed-message");
+
+let account;
+connectButton.addEventListener("click", async (e) => {
+    e.preventDefault();
+    if (account) {
+        console.log("Disconnect");
+    } else {
+        window.ethereum.request({
+            method: "eth_requestAccounts",
+            params: [],
+        }).then((res) => {
+            console.log(`Accounts: ${res}`)
+            connectButton.innerHTML = res[0];
+            theForm.innerHTML = `            
+                <label for="first-name">Name:</label>
+                <input type="text" id="name" name="name"><br>
+                <input type="submit" value="Submit">
+            `;
+            account = res[0];
+        }).catch((err) => {
+            console.error(err)
+        });
+    }
+})
+theForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    let form = e.currentTarget;
+    let url = form.action;
+
+    try {
+        let entries = Object.fromEntries(new FormData(form).entries());
+        entries["account"] = account;
+        let resp = await fetch(url, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Accept: "application/json",
+            },
+            body: JSON.stringify(entries),
+        });
+        let msg = await resp.text();
+        //serverResp.innerText = msg;
+        window.ethereum.request({
+            method: "eth_signTypedData_v4",
+            params: [
+                account,
+                msg
+            ],
+        }).then(async (res) => {
+            console.log(`Signed message: ${res}`)
+            signedMessage.innerHTML = "Your signed message: " + res;
+            let check_req = await fetch("/verify", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Accept: "application/json",
+                },
+                body: res,
+            }).then(async (res2) => {
+                let res3 = await res2.text();
+                console.log(res3)
+            })
+        }).catch((err) => {
+            console.error(err)
+        });
+    } catch (err) {
+        console.error(err);
+    }
+});
+
+</script>
+</body>
+</html>
